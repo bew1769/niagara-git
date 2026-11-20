@@ -1,7 +1,7 @@
 # Tool sources use LF. install.ps1 stays CRLF for Windows PowerShell 5.1.
 * text=auto eol=lf
 *.sh text eol=lf
-*.py text eol=lf
+*.go text eol=lf
 *.md text eol=lf
 install.ps1 text eol=crlf
 # Zip archives must not be newline-converted. The diff drivers are set below.

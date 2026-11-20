@@ -1,10 +1,7 @@
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.mypy_cache/
-*.egg-info/
-.venv/
-venv/
+# Built binaries. Release builds are attached to GitHub tags.
+/niagara-git
+/niagara-git.exe
+/dist/
 
 # niagara-git:begin
 # Starter ignores for a Niagara 4 station folder.

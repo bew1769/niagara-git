@@ -2,7 +2,7 @@
 
 Git diffs for Tridium Niagara 4 station files. A station database (`.bog`) and a station backup (`.dist`) are zip archives, so Git otherwise shows them as opaque binaries. niagara-git teaches Git to print what changed: components, points, links, and properties.
 
-It is a view only. The files stored in the repository stay the original zip archives, which is what Workbench and the Distribution File Installer expect.
+The program is one self-contained binary. A Workbench PC does not need Python, or any other runtime, installed. The diff is a view only. The files stored in the repository stay the original zip archives, which is what Workbench and the Distribution File Installer expect.
 
 ## Security
 
@@ -28,26 +28,51 @@ The text is deterministic: zip entry order, compression, and timestamps do not c
 
 ## Install
 
-You need Git and Python 3.8 or newer on `PATH`. No third-party packages. On Windows, use Git for Windows (the textconv command runs through its shell).
+You need Git. On Windows, use Git for Windows: the textconv command runs through its shell. There is nothing else to install. The starter `.gitattributes` and `.gitignore` templates are embedded in the binary, so the download is a single file.
 
-From the station repository, or by passing its path:
+Download the binary for your machine from the latest [GitHub release](https://github.com/bew1769/niagara-git/releases/latest):
+
+| Machine | File |
+| --- | --- |
+| Windows 64-bit | `niagara-git-windows-amd64.exe` |
+| Linux 64-bit | `niagara-git-linux-amd64` |
+| Linux ARM 64-bit | `niagara-git-linux-arm64` |
+| macOS Apple silicon | `niagara-git-darwin-arm64` |
+| macOS Intel | `niagara-git-darwin-amd64` |
+
+Linux:
 
 ```bash
-# Linux, macOS, or Git Bash
-/path/to/niagara-git/install.sh
-/path/to/niagara-git/install.sh /path/to/station-repo
+curl -fsSL -o niagara-git https://github.com/bew1769/niagara-git/releases/latest/download/niagara-git-linux-amd64
+chmod +x niagara-git
+./niagara-git install
+./niagara-git install /path/to/station-repo
+```
+
+Windows PowerShell:
+
+```powershell
+Invoke-WebRequest https://github.com/bew1769/niagara-git/releases/latest/download/niagara-git-windows-amd64.exe -OutFile niagara-git.exe
+.\niagara-git.exe install
+.\niagara-git.exe install D:\stations\demoPlant
+```
+
+`install.sh` and `install.ps1` are thin wrappers around that same command. They use a `niagara-git` binary sitting next to the script or already on `PATH`. If they cannot find one, they download the release that matches this machine, then run `niagara-git install`.
+
+```bash
+./install.sh
+./install.sh /path/to/station-repo
 ```
 
 ```powershell
-# Windows PowerShell
-powershell -ExecutionPolicy Bypass -File C:\tools\niagara-git\install.ps1
+powershell -ExecutionPolicy Bypass -File .\install.ps1
 powershell -ExecutionPolicy Bypass -File C:\tools\niagara-git\install.ps1 D:\stations\demoPlant
 ```
 
-The installer does two things:
+`niagara-git install` does two things:
 
 1. Merges the starter `.gitattributes` and `.gitignore` blocks into the repo. Rules you already have outside the `# niagara-git:begin` / `# niagara-git:end` markers are left in place. Re-running the installer replaces only that block.
-2. Sets local git config (not `--global`) so `git diff` runs this program:
+2. Sets local git config (not `--global`) so `git diff` runs this binary:
 
 ```text
 diff.niagara-bog.textconv
@@ -73,7 +98,7 @@ After you pull a newer niagara-git, run the installer again. The textconv comman
 
 ## Sample station
 
-`examples/demoPlant` is a made-up air-handler station. Regenerate it with `python3 scripts/generate_fixtures.py`. It is not a commissioned database and is not meant to boot in Workbench.
+`examples/demoPlant` is a made-up air-handler station checked into this repository. It is not a commissioned database and is not meant to boot in Workbench.
 
 * `station/` is the before folder: `config.bog` plus a Px view, a nav file, and a palette.
 * `station-v2/` changes the supply-temp fallback from 72.0 to 70.0, adds an `Occupied` point, and links that point to `SupplyFan`.
@@ -186,7 +211,16 @@ Not in this version:
 ## Tests
 
 ```bash
-python3 -m unittest discover -s tests -v
+go test ./...
+```
+
+GitHub Actions runs that on Linux and Windows. Pushing a `v*` tag also cross-compiles the five release binaries and attaches them to the GitHub release.
+
+Building from a checkout, if you already have the Go toolchain:
+
+```bash
+go build -o niagara-git .
+./niagara-git install
 ```
 
 ## File format notes
