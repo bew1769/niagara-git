@@ -33,6 +33,13 @@ func sha256Hex(data []byte) string {
 }
 
 func convertBog(data []byte) string {
+	if isStore(data) {
+		zipped, err := smudge(data)
+		if err != nil {
+			return opaque("bog", data, "store format could not be rebuilt")
+		}
+		return convertBogZip(zipped)
+	}
 	if bytes.HasPrefix(data, []byte("PK")) {
 		return convertBogZip(data)
 	}

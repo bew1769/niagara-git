@@ -190,8 +190,9 @@ A platform backup `.dist` is a zip. Workbench names it `backup_<station>_<YYMMDD
 
 ## Limitations
 
-* Textconv runs locally. GitHub and other hosts still show `.bog` and `.dist` as binary files in a pull request. Review those diffs on a machine where niagara-git is installed, or read the textconv output there.
-* Blobs are still zips. This version does not use clean/smudge filters, so a checkout is unchanged and Workbench can open `config.bog` directly.
+* Textconv runs locally. GitHub and other hosts do not run the clean filter or textconv. With the default install, a pull request still shows `.bog` and `.dist` as binary. With `--store-xml`, the pull request shows the stored text container (the original `file.xml` bytes plus any other zip entries) instead of a zip.
+* `--store-xml` is off unless you ask for it. Checkout rebuilds a `.bog` whose entry names, order, and uncompressed bytes match the station Niagara saved. The zip timestamp and compression are normalized so the git object stays stable.
+* `.dist` backups are not stored with clean/smudge. A distribution archive contains history databases, alarm databases, and keystores. Putting that through a clean filter would commit those bytes and would change on every backup. Keep diffing `.dist` files with textconv. `snapshot` extracts `config.bog` (and, with `--shared`, the non-secret `shared/` files) instead of committing the `.dist` itself.
 * Passphrase-encrypted bog and dist files are not decrypted.
 * Baja reversible encoding is left as stored. Values are not decoded.
 * Pretty-printing normalizes attribute order and insignificant whitespace, and it drops comments that sit outside the root element. A reorder of attributes alone does not show up. Element order is preserved.
@@ -201,12 +202,66 @@ A platform backup `.dist` is a zip. Workbench names it `backup_<station>_<YYMMDD
 * A `.dist` made while the station is running can contain a `config.backup.*.bog` that does not match the live `config.bog`. The timestamped copy is treated as noise; compare `config.bog`.
 * The sample XML uses the public object-graph shape (`bajaObjectGraph`, `p` properties, `b:Link` slots). It is not a complete station.
 
-## Roadmap
+## Storing a .bog as text
 
-Not in this version:
+By default Git keeps the zip. `git diff` uses the textconv driver and Workbench opens `config.bog` directly.
 
-* **Clean/smudge filters** that store a `.bog` as expanded XML in the repository and rebuild a lossless zip on checkout, so hosts that cannot run textconv still show a text diff.
-* **A station snapshot / auto-commit script** that copies `config.bog` (and `shared/`) on a schedule or from a backup folder and commits it.
+`niagara-git install --store-xml` opts into a clean/smudge filter. The object in the repository is a small text container: every zip entry, in the original order, with its original bytes. `git checkout` runs `niagara-git smudge` and writes a `.bog` zip again. The same station produces the same container, including when Workbench only changed the zip timestamp or compression. `niagara-git install --no-store-xml` turns the filter off. A plain `niagara-git install` leaves the choice as it is.
+
+`.dist` files are not included. They bundle histories, alarms, and keystores, and those do not belong in a clean filter. They stay on the textconv driver.
+
+After you turn `--store-xml` on in a repo that already committed zip blobs, `config.bog` shows as modified once. Commit it to switch the stored form. Older commits still check out: smudge leaves an existing zip blob unchanged.
+
+## Station snapshots
+
+`niagara-git snapshot` copies a station into a git repository and commits only when the bytes changed.
+
+```bash
+niagara-git snapshot --source C:\ProgramData\Niagara4.14\stations\demoPlant --repo D:\git\demoPlant --shared
+niagara-git snapshot --source /opt/niagara/stations/demoPlant --repo /srv/git/demoPlant --shared --push
+niagara-git snapshot --source D:\backups --repo D:\git\demoPlant
+```
+
+`--source` may be a station directory (the folder that contains `config.bog`), a `.bog` file, a `.dist` file, or a folder of backups. A backup folder uses the newest `.bog` or `.dist` by modification time. From a `.dist`, snapshot commits `config.bog` and, with `--shared`, the `shared/` files. It does not commit the `.dist` itself, and it does not commit keystores, certificates, histories, alarms, or logs. The embedded ignore rules are installed into the snapshot repo if they are not already there.
+
+The commit message is `snapshot` plus a UTC timestamp, for example `snapshot 2026-11-21T00:15:00Z`. `--push` pushes the current branch to `origin`, and sets the upstream on the first push.
+
+Run `niagara-git install` once in that repo (snapshot does this) so `git diff` can read `.bog` files. Add `--store-xml` on that install if you want the text container.
+
+Schedule it once an hour.
+
+Windows Task Scheduler:
+
+```text
+schtasks /Create /F /TN "Niagara git snapshot" /SC HOURLY /ST 00:15 /TR "\"C:\Tools\niagara-git.exe\" snapshot --source \"C:\ProgramData\Niagara4.14\stations\demoPlant\" --repo \"D:\git\demoPlant\" --shared"
+```
+
+cron:
+
+```text
+15 * * * * /usr/local/bin/niagara-git snapshot --source /opt/niagara/stations/demoPlant --repo /srv/git/demoPlant --shared
+```
+
+systemd, in `/etc/systemd/system/niagara-snapshot.service`:
+
+```text
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/niagara-git snapshot --source /opt/niagara/stations/demoPlant --repo /srv/git/demoPlant --shared
+```
+
+and `/etc/systemd/system/niagara-snapshot.timer`:
+
+```text
+[Timer]
+OnCalendar=hourly
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+Then `systemctl enable --now niagara-snapshot.timer`.
 
 ## Tests
 
