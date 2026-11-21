@@ -115,6 +115,30 @@ func TestSnapshotPushToLocalRemote(t *testing.T) {
 	}
 }
 
+func TestEnsureRepoAcceptsAliasOfRoot(t *testing.T) {
+	real := t.TempDir()
+	git(t, real, "init")
+	parent := t.TempDir()
+	link := filepath.Join(parent, "repo-link")
+	if err := os.Symlink(real, link); err != nil {
+		t.Skip(err)
+	}
+	got, err := ensureRepo(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sameDir(got, real) {
+		t.Fatalf("ensureRepo(%s) = %s, want %s", link, got, real)
+	}
+	nested := filepath.Join(real, "nested")
+	if err := os.Mkdir(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ensureRepo(nested); err == nil {
+		t.Fatal("subdirectory of a repo was accepted as the repository root")
+	}
+}
+
 func copyFile(t *testing.T, src, dest string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
